@@ -1,6 +1,11 @@
 import argparse
 from pathlib import Path
 
+import os
+import numpy as np
+import torch
+from PIL import Image
+
 from munch import munchify
 from torchvision.utils import save_image
 
@@ -9,6 +14,16 @@ from latent_sdxl import get_solver as get_solver_sdxl
 from utils.callback_util import ComposeCallback
 from utils.log_util import create_workdir, set_seed
 
+
+def create_workdir(workdir: Path):
+    workdir.mkdir(parents=True, exist_ok=True)
+    #workdir.joinpath('images').mkdir(exist_ok=True)
+    #workdir.joinpath('logs').mkdir(exist_ok=True)
+
+def set_seed(seed: int):
+    torch.random.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    np.random.seed(seed)
 
 def main():
     parser = argparse.ArgumentParser(description="Latent Diffusion")
@@ -21,6 +36,8 @@ def main():
     parser.add_argument("--model", type=str, default='sd15', choices=["sd15", "sd20", "sdxl", "sdxl_lightning", "sdxl_lightning_lora", "lcm", "lcmlora"])
     parser.add_argument("--NFE", type=int, default=50)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument('--result_dir', type=Path, default=Path('result'))
+    parser.add_argument('--prompt_dir', type=Path, default=Path('/home/user/research/dataset/MSCOCO/coco_v2.txt'))
     args = parser.parse_args()
 
     set_seed(args.seed)
@@ -29,33 +46,34 @@ def main():
     solver_config = munchify({'num_sampling': args.NFE, 
                               'do_lora': True if 'lora' in args.model else False,
                               })
-    #callback = ComposeCallback(workdir=args.workdir,
-    #                           frequency=1,
-    #                           callbacks=["draw_noisy", 'draw_tweedie'])
     callback = None
 
+    # load prompt
+    text_list = []
+    with open(args.prompt_dir, 'r') as f:
+        lines = f.readlines()
+        for line in lines:
+            stripped_line = line.strip()
+            if stripped_line:  # Only add non-empty lines
+                text_list.append(stripped_line)
+    text_list = text_list[:10000]
 
-    if args.model == "sdxl" or args.model == "sdxl_lightning" or args.model == 'sdxl_lightning_lora' or args.model == 'lcm' or args.model == 'lcmlora':
-        solver = get_solver_sdxl(args.method,
-                                 solver_config=solver_config,
-                                 device=args.device)
+    # load model
+    solver = get_solver_sdxl(args.method,
+                             solver_config=solver_config,
+                             device=args.device)
 
-        result = solver.sample(prompt1=[args.null_prompt, args.prompt],
-                                prompt2=[args.null_prompt, args.prompt],
+    # inference
+    for i, text in enumerate(text_list):
+        print(f'Processing {i+1}/{len(text_list)}: {text}')
+
+        result = solver.sample(prompt1=[args.null_prompt, text],
+                                prompt2=[args.null_prompt, text],
                                 cfg_guidance=args.cfg_guidance,
                                 target_size=(1024, 1024),
                                 callback_fn=callback)
+        fname = os.path.join(args.workdir, f'{str(i).zfill(5)}.png')
+        save_image(result, fname, normalize=True)
 
-    else:
-        solver = get_solver(args.method,
-                            solver_config=solver_config,
-                            device=args.device)
-        result = solver.sample(prompt=[args.null_prompt, args.prompt],
-                               cfg_guidance=args.cfg_guidance,
-                               callback_fn=callback)
-
-    
-    save_image(result, args.workdir.joinpath(f'result/generated.png'), normalize=True)
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
