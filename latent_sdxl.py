@@ -1006,7 +1006,7 @@ class EulerLightpp(Euler, SDXLLightning, SDXLLightningLoRA):
                 with torch.no_grad():
                     z0t_t, _ = self.kdiffusion_zt_to_denoised(zt_renoise, sigmas[step+1], null_prompt_embeds, prompt_embeds, 6., t, add_cond_kwargs, model='teacher')
                 
-                    teacher_guidance = 0.1 #0.02
+                    teacher_guidance = 0.03 #0.02
                     z0t = z0t + teacher_guidance * (z0t_t - z0t)
 
             # Euler method
