@@ -973,6 +973,8 @@ class EulerLightpp(Euler, SDXLLightning, SDXLLightningLoRA):
                         shape=(1024, 1024),
                         callback_fn=None,
                         **kwargs):
+        teacher_guidance = kwargs.get('teacher_guidance', 0.02)
+        
        # convert to karras sigma scheduler
         total_sigmas = (1-self.total_alphas).sqrt() / self.total_alphas.sqrt()
         #sigmas = get_sigmas_karras(len(self.scheduler.timesteps), total_sigmas.min(), total_sigmas.max(), rho=7.)
@@ -1004,9 +1006,8 @@ class EulerLightpp(Euler, SDXLLightning, SDXLLightningLoRA):
 
                 # compute noise_teacher
                 with torch.no_grad():
-                    z0t_t, _ = self.kdiffusion_zt_to_denoised(zt_renoise, sigmas[step+1], null_prompt_embeds, prompt_embeds, 6., t, add_cond_kwargs, model='teacher')
+                    z0t_t, _ = self.kdiffusion_zt_to_denoised(zt_renoise, sigmas[step+1], null_prompt_embeds, prompt_embeds, 7.5, t, add_cond_kwargs, model='teacher')
                 
-                    teacher_guidance = 0.03 #0.02
                     z0t = z0t + teacher_guidance * (z0t_t - z0t)
 
             # Euler method
@@ -1265,14 +1266,19 @@ class EulerCFGpp(SDXL):
         return z0t
 
 @register_solver('euler_cfg++_lightning')
-class EulerCFGppLight(EulerCFGpp, SDXLLightning):
+class EulerCFGppLight(EulerCFGpp, SDXLLightning, SDXLLightningLoRA):
     """
     Karras Euler (VE casted)
     """
     quantize = True
 
     def __init__(self, **kwargs):
-        SDXLLightning.__init__(self, **kwargs)
+        solver_config = kwargs.get('solver_config', {})
+        self.do_lora = solver_config['do_lora']
+        if self.do_lora:
+            SDXLLightningLoRA.__init__(self, **kwargs)
+        else:
+            SDXLLightning.__init__(self, **kwargs)
 
     @torch.autocast(device_type='cuda', dtype=torch.float16)
     def reverse_process(self,
