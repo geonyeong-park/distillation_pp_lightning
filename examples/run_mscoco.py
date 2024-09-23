@@ -32,7 +32,8 @@ def main():
     parser.add_argument("--null_prompt", type=str, default="low quality,jpeg artifacts,blurry,poorly drawn,ugly,worst quality,")
     parser.add_argument("--prompt", type=str, default="")
     parser.add_argument("--cfg_guidance", type=float, default=7.5)
-    parser.add_argument("--teacher_guidance", type=float, default=0.02)
+    parser.add_argument("--teacher_guidance", type=float, default=0.1)
+    parser.add_argument("--guide_step", type=int, default=2)
     parser.add_argument("--method", type=str, default='ddim')
     parser.add_argument("--model", type=str, default='sd15', choices=["sd15", "sd20", "sdxl", "sdxl_lightning", "sdxl_lightning_lora", "lcm", "lcmlora"])
     parser.add_argument("--NFE", type=int, default=50)
@@ -47,7 +48,8 @@ def main():
     solver_config = munchify({'num_sampling': args.NFE, 
                               'do_lora': True if 'lora' in args.model else False,
                               })
-    guide_config = munchify({'teacher_guidance': args.teacher_guidance})
+    guide_config = munchify({'teacher_guidance': args.teacher_guidance,
+                             'guide_step': args.guide_step})
     callback = None
 
     # load prompt

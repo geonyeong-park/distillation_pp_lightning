@@ -19,6 +19,8 @@ def main():
     parser.add_argument("--null_prompt", type=str, default="")
     parser.add_argument("--prompt", type=str, default="")
     parser.add_argument("--cfg_guidance", type=float, default=7.5)
+    parser.add_argument("--teacher_guidance", type=float, default=0.02)
+    parser.add_argument("--guide_step", type=int, default=2)
     parser.add_argument("--method", type=str, default='ddim')
     parser.add_argument("--model", type=str, default='sd15', choices=["sd15", "sd20", "sdxl", "sdxl_lightning"])
     parser.add_argument("--NFE", type=int, default=50)
@@ -40,6 +42,8 @@ def main():
 
 
     solver_config = munchify({'num_sampling': args.NFE })
+    guide_config = munchify({'teacher_guidance': args.teacher_guidance,
+                            'guide_step': args.guide_step})
     callback = ComposeCallback(workdir=args.workdir,
                                frequency=1,
                                callbacks=["draw_noisy", 'draw_tweedie'])
@@ -58,7 +62,8 @@ def main():
                                     prompt2=[args.null_prompt, text],
                                     cfg_guidance=args.cfg_guidance,
                                     target_size=(1024, 1024),
-                                    callback_fn=callback)
+                                    callback_fn=callback,
+                                    **guide_config)
             save_image(result, args.workdir.joinpath(f'{str(i).zfill(5)}.png'), normalize=True)
 
 if __name__ == "__main__":
