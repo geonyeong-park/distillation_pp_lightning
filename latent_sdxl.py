@@ -735,10 +735,12 @@ class RandomppLCMSolver(RandomSolver, LCM):
                         prompt_embeds,
                         cfg_guidance,
                         add_cond_kwargs,
-                        teacher_guidance=0.1,
                         shape=(1024, 1024),
                         callback_fn=None,
                         **kwargs):
+
+        teacher_guidance = kwargs.get('teacher_guidance', 0.01)
+        guide_step = kwargs.get('guide_step', 3)
 
         zt = self.initialize_latent(size=(1, 4, shape[1] // self.vae_scale_factor, shape[0] // self.vae_scale_factor))
 
@@ -769,7 +771,7 @@ class RandomppLCMSolver(RandomSolver, LCM):
             c_skip, c_out = self.get_scalings_for_boundary_condition_discrete(t)
             z0t = c_out * z0t + c_skip * zt
 
-            if step < 3: 
+            if step < guide_step: 
                 # Renoising for teacher guidance
                 z0t_renoise = at_next.sqrt() * z0t + (1-at_next).sqrt() * torch.randn_like(z0t)
 
@@ -778,7 +780,7 @@ class RandomppLCMSolver(RandomSolver, LCM):
                     noise_uc, noise_c = self.predict_noise(z0t_renoise, next_t, null_prompt_embeds, prompt_embeds, add_cond_kwargs, model='teacher')
                     noise_t = noise_uc + cfg_guidance * (noise_c - noise_uc)
 
-                noise_pred = noise_s + 0.01 * (noise_t - noise_s)
+                noise_pred = noise_s + teacher_guidance * (noise_t - noise_s)
 
                 z0t = (zt - (1-at).sqrt() * noise_pred) / at.sqrt()
                 c_skip, c_out = self.get_scalings_for_boundary_condition_discrete(t)
