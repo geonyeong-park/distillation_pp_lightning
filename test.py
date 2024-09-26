@@ -1,4 +1,3 @@
-"""
 from diffusers import AutoPipelineForText2Image
 import torch
 import numpy as np
@@ -14,8 +13,8 @@ prompt = "A cinematic shot of a baby racoon wearing an intricate italian priest 
 
 image = pipeline_text2image(prompt=prompt, guidance_scale=0.0, num_inference_steps=4).images[0]
 image.save("examples/workdir/t2i/result/generated_test.png")
-"""
 
+"""
 from diffusers import DiffusionPipeline, UNet2DConditionModel, LCMScheduler, StableDiffusionXLPipeline
 import torch
 import numpy as np
@@ -41,3 +40,4 @@ image = pipe(
     prompt=prompt, num_inference_steps=4, generator=generator, guidance_scale=8.0
 ).images[0]
 image.save("examples/workdir/t2i/result/generated_test.png")
+"""

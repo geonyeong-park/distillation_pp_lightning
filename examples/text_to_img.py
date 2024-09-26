@@ -20,7 +20,7 @@ def main():
     parser.add_argument("--teacher_guidance", type=float, default=0.02)
     parser.add_argument("--guide_step", type=int, default=2)
     parser.add_argument("--method", type=str, default='ddim')
-    parser.add_argument("--model", type=str, default='sd15', choices=["sd15", "sd20", "sdxl", "sdxl_lightning", "sdxl_lightning_lora", "lcm", "lcmlora"])
+    parser.add_argument("--model", type=str, default='sd15', choices=["sd15", "sd20", "sdxl", "sdxl_lightning", "sdxl_lightning_lora", "lcm", "lcmlora", "sdxl_turbo"])
     parser.add_argument("--NFE", type=int, default=50)
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
@@ -30,6 +30,7 @@ def main():
 
     solver_config = munchify({'num_sampling': args.NFE, 
                               'do_lora': True if 'lora' in args.model else False,
+                              'model': args.model,
                               })
     guide_config = munchify({'teacher_guidance': args.teacher_guidance,
                              'guide_step': args.guide_step})
@@ -39,7 +40,7 @@ def main():
     callback = None
 
 
-    if args.model == "sdxl" or args.model == "sdxl_lightning" or args.model == 'sdxl_lightning_lora' or args.model == 'lcm' or args.model == 'lcmlora':
+    if args.model == "sdxl" or args.model == "sdxl_lightning" or args.model == 'sdxl_lightning_lora' or args.model == 'lcm' or args.model == 'lcmlora' or args.model == 'sdxl_turbo':
         solver = get_solver_sdxl(args.method,
                                  solver_config=solver_config,
                                  device=args.device)
