@@ -30,7 +30,7 @@ def get_solver(name: str, **kwargs):
 ########################
 
 class SDXL():
-    def __init__(self, 
+    def __init__(self,
                  solver_config: dict,
                  model_key:str="stabilityai/stable-diffusion-xl-base-1.0",
                  dtype=torch.float16,
@@ -97,7 +97,7 @@ class SDXL():
         '''
         At this time, assume that batch_size = 1.
         We should extend the code to batch_size > 1.
-        '''        
+        '''
         # Encode the prompts
         # if prompt_2 is None, set same as prompt_1
         prompt_1 = [prompt_1] if isinstance(prompt_1, str) else prompt_1
@@ -113,7 +113,7 @@ class SDXL():
             # i.e. we overwrite the pool_prompt_embed with the new one
             prompt_embed_2, pool_prompt_embed = self._text_embed(prompt_2, self.tokenizer_2, self.text_enc_2, clip_skip)
             prompt_embed = [prompt_embed_1, prompt_embed_2]
-        
+
         null_embed_1, pool_null_embed = self._text_embed(null_prompt_1, self.tokenizer_1, self.text_enc_1, clip_skip)
         if null_prompt_2 is None:
             null_embed = [null_embed_1]
@@ -125,7 +125,7 @@ class SDXL():
         null_prompt_embeds = torch.concat(null_embed, dim=-1)
         prompt_embeds = torch.concat(prompt_embed, dim=-1)
 
-        return null_prompt_embeds, prompt_embeds, pool_null_embed, pool_prompt_embed            
+        return null_prompt_embeds, prompt_embeds, pool_null_embed, pool_prompt_embed
 
     # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_upscale.StableDiffusionUpscalePipeline.upcast_vae
     def upcast_vae(self):
@@ -149,9 +149,9 @@ class SDXL():
 
     @torch.no_grad()
     def encode(self, x):
-        return self.vae.encode(x).latent_dist.sample() * self.vae.config.scaling_factor 
+        return self.vae.encode(x).latent_dist.sample() * self.vae.config.scaling_factor
 
-    # @torch.no_grad() 
+    # @torch.no_grad()
     def decode(self, zt):
         # make sure the VAE is in float32 mode, as it overflows in float16
         # needs_upcasting = self.vae.dtype == torch.float16 and self.vae.config.force_upcast
@@ -246,7 +246,7 @@ class SDXL():
             )
         else:
             negative_add_time_ids = add_time_ids
-        negative_text_embeds = pool_null_embed 
+        negative_text_embeds = pool_null_embed
 
         if cfg_guidance != 0.0 and cfg_guidance != 1.0:
             # do cfg
@@ -295,13 +295,13 @@ class SDXL():
             z = torch.randn(size).to(self.device)
             z = z * (sigmas[0] ** 2 + 1) ** 0.5
             #z = z * sigmas[0]
-        else: 
+        else:
             raise NotImplementedError
 
         return z.requires_grad_()
-    
+
     def inversion(self, z0, uc, c, cfg_guidance, add_cond_kwargs):
-        # if we use cfg_guidance=0.0 or 1.0 for inversion, add_cond_kwargs must be splitted. 
+        # if we use cfg_guidance=0.0 or 1.0 for inversion, add_cond_kwargs must be splitted.
         if cfg_guidance == 0.0 or cfg_guidance == 1.0:
             add_cond_kwargs['text_embeds'] = add_cond_kwargs['text_embeds'][-1].unsqueeze(0)
             add_cond_kwargs['time_ids'] = add_cond_kwargs['time_ids'][-1].unsqueeze(0)
@@ -320,18 +320,18 @@ class SDXL():
             zt = at.sqrt() * z0t + (1-at).sqrt() * noise_pred
 
         return zt
-    
+
     def reverse_process(self, *args, **kwargs):
         raise NotImplementedError
 
     # Belows are for K-diffusion sampling (euler, etc)
     def calculate_input(self, x, sigma):
         return x / (sigma ** 2 + 1) ** 0.5
-    
+
     # Related to the Tweedie's formula in VE
     def calculate_denoised(self, x, model_pred, sigma):
         return x - model_pred * sigma
-    
+
     def sigma_to_t(self, sigma, quantize=None):
         '''Taken from k_diffusion/external.py'''
         quantize = self.quantize if quantize is None else quantize
@@ -346,7 +346,7 @@ class SDXL():
         w = w.clamp(0, 1)
         t = (1 - w) * low_idx + w * high_idx
         return t.view(sigma.shape)
-    
+
     def timestep(self, sigma):
         log_sigma = sigma.log()
         dists = log_sigma.to(self.log_sigmas.device) - self.log_sigmas[:, None]
@@ -355,7 +355,7 @@ class SDXL():
     def to_d(self, x, sigma, denoised):
         '''converts a denoiser output to a Karras ODE derivative'''
         return (x - denoised) / sigma.item()
-    
+
     def kdiffusion_zt_to_denoised(self, x, sigma, uc, c, cfg_guidance, t, add_cond_kwargs, model='student'):
         xc = self.calculate_input(x, sigma)
         noise_uc, noise_c = self.predict_noise(xc, t, uc, c, add_cond_kwargs, model)
@@ -366,7 +366,7 @@ class SDXL():
 
 
 class SDXLLightning(SDXL):
-    def __init__(self, 
+    def __init__(self,
                  solver_config: dict,
                  base_model_key:str="stabilityai/stable-diffusion-xl-base-1.0",
                  light_model_ckpt:str="ckpt/sdxl_lightning_4step_unet.safetensors",
@@ -390,23 +390,23 @@ class SDXLLightning(SDXL):
 
         #pipe = StableDiffusionXLPipeline.from_single_file(light_model_ckpt, torch_dtype=dtype).to(device)
         #self.unet = pipe.unet
-        pipe = StableDiffusionXLPipeline.from_pretrained(base_model_key, unet=self.unet, torch_dtype=dtype).to(device)
+        self.pipe = StableDiffusionXLPipeline.from_pretrained(base_model_key, unet=self.unet, torch_dtype=dtype).to(device)
         self.unet_t = UNet2DConditionModel.from_config(base_model_key, subfolder="unet").to("cuda", torch.float16)
         self.dtype = dtype
 
         # avoid overflow in float16
         self.vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=dtype).to(device)
 
-        self.tokenizer_1 = pipe.tokenizer
-        self.tokenizer_2 = pipe.tokenizer_2
-        self.text_enc_1 = pipe.text_encoder
-        self.text_enc_2 = pipe.text_encoder_2
+        self.tokenizer_1 = self.pipe.tokenizer
+        self.tokenizer_2 = self.pipe.tokenizer_2
+        self.text_enc_1 = self.pipe.text_encoder
+        self.text_enc_2 = self.pipe.text_encoder_2
 
         self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
         self.default_sample_size = self.unet.config.sample_size
 
         # sampling parameters
-        self.scheduler = EulerDiscreteScheduler.from_config(pipe.scheduler.config, timestep_spacing="trailing")
+        self.scheduler = EulerDiscreteScheduler.from_config(self.pipe.scheduler.config, timestep_spacing="trailing")
         self.total_alphas = self.scheduler.alphas_cumprod.clone()
 
         self.sigmas = (1-self.total_alphas).sqrt() / self.total_alphas.sqrt()
@@ -421,7 +421,7 @@ class SDXLLightning(SDXL):
 
 
 class SDXLLightningLoRA(SDXL):
-    def __init__(self, 
+    def __init__(self,
                  solver_config: dict,
                  base_model_key:str="stabilityai/stable-diffusion-xl-base-1.0",
                  light_model_ckpt:str="ckpt/sdxl_lightning_4step_lora.safetensors",
@@ -470,7 +470,7 @@ class SDXLLightningLoRA(SDXL):
 
 
 class LCMLoRA(SDXL):
-    def __init__(self, 
+    def __init__(self,
                  solver_config: dict,
                  base_model_key:str="stabilityai/stable-diffusion-xl-base-1.0",
                  lcm_ckpt:str="latent-consistency/lcm-lora-sdxl",
@@ -516,16 +516,16 @@ class LCMLoRA(SDXL):
         self.scheduler.alphas_cumprod = torch.cat([torch.tensor([1.0]), self.scheduler.alphas_cumprod]).to(device)
 
 class LCM(SDXL):
-    def __init__(self, 
-                 solver_config: dict, 
-                 base_model_key: str = "stabilityai/stable-diffusion-xl-base-1.0", 
-                 lcm_ckpt: str = "latent-consistency/lcm-sdxl", 
-                 dtype=torch.float16, 
+    def __init__(self,
+                 solver_config: dict,
+                 base_model_key: str = "stabilityai/stable-diffusion-xl-base-1.0",
+                 lcm_ckpt: str = "latent-consistency/lcm-sdxl",
+                 dtype=torch.float16,
                  device='cuda'):
         self.device = device
         self.solver_config = solver_config
 
-        # Load LCM 
+        # Load LCM
         pipe = StableDiffusionXLPipeline.from_pretrained(base_model_key, torch_dtype=dtype).to(device)
         self.unet = UNet2DConditionModel.from_pretrained(
             lcm_ckpt, torch_dtype=torch.float16, variant="fp16",
@@ -562,8 +562,9 @@ class LCM(SDXL):
         #self.final_alpha_cumprod = self.scheduler.final_alpha_cumprod.to(device)
         self.scheduler.alphas_cumprod = torch.cat([torch.tensor([1.0]), self.scheduler.alphas_cumprod]).to(device)
 
+<<<<<<< HEAD
 class SDXLTurbo(SDXL):
-    def __init__(self, 
+    def __init__(self,
                  solver_config: dict,
                  base_model_key:str="stabilityai/stable-diffusion-xl-base-1.0",
                  turbo_key:str="stabilityai/sdxl-turbo",
@@ -603,20 +604,44 @@ class SDXLTurbo(SDXL):
         #self.final_alpha_cumprod = self.scheduler.final_alpha_cumprod.to(device)
         self.scheduler.alphas_cumprod = torch.cat([torch.tensor([1.0]), self.scheduler.alphas_cumprod]).to(device)
 
+class DMD(SDXLLightning):
+    def __init__(self,
+                 solver_config: dict,
+                 base_model_key:str="stabilityai/stable-diffusion-xl-base-1.0",
+                 light_model_ckpt:str="/home/user/research/distillation_pp/ckpt/pytorch_model.bin",
+                 dtype=torch.float16,
+                 device='cuda'):
+
+        super().__init__(solver_config, base_model_key, light_model_ckpt, dtype, device)
+        self.scheduler = LCMScheduler.from_config(self.pipe.scheduler.config)
+
+        self.total_alphas = self.scheduler.alphas_cumprod.clone()
+
+        self.sigmas = (1-self.total_alphas).sqrt() / self.total_alphas.sqrt()
+        self.log_sigmas = self.sigmas.log()
+
+        self.scheduler.set_timesteps(timesteps=[999, 749, 499, 249], device=device)
+        self.skip = 250
+
+        #self.final_alpha_cumprod = self.scheduler.final_alpha_cumprod.to(device)
+        #self.scheduler.alphas_cumprod = torch.cat([torch.tensor([1.0]), self.scheduler.alphas_cumprod]).to(device)
+
 
 ###########################################
 # Base version
 ###########################################
 
 @register_solver('random')
-class RandomSolver(LCM, LCMLoRA):
+class RandomSolver(LCM, LCMLoRA, DMD):
     def __init__(self, **kwargs):
         solver_config = kwargs.get('solver_config', {})
-        self.do_lora = solver_config['do_lora']
-        if self.do_lora:
+        self.model = solver_config['model']
+        if self.model == 'lcmlora':
             LCMLoRA.__init__(self, **kwargs)
-        else:
+        elif self.model == 'lcm':
             LCM.__init__(self, **kwargs)
+        elif self.model == 'dmd':
+            DMD.__init__(self, **kwargs)
 
     def get_scalings_for_boundary_condition_discrete(self, timestep, timestep_scaling=10.):
         self.sigma_data = 0.5  # Default: 0.5
@@ -635,11 +660,11 @@ class RandomSolver(LCM, LCMLoRA):
                         shape=(1024, 1024),
                         callback_fn=None,
                         **kwargs):
-        if self.do_lora: 
+        if self.model == 'lcmlora':
             assert cfg_guidance == 1.0, "CFG should be turned off in LCM LoRA"
 
         zt = self.initialize_latent(size=(1, 4, shape[1] // self.vae_scale_factor, shape[0] // self.vae_scale_factor))
-        
+
         # sampling
         pbar = tqdm(self.scheduler.timesteps.int(), desc='SDXL')
         for step, t in enumerate(pbar):
@@ -650,11 +675,12 @@ class RandomSolver(LCM, LCMLoRA):
             with torch.no_grad():
                 noise_uc, noise_c = self.predict_noise(zt, t, null_prompt_embeds, prompt_embeds, add_cond_kwargs)
                 noise_pred = noise_uc + cfg_guidance * (noise_c - noise_uc)
-            
+
             # tweedie and boundary condition parameterization
             z0t = (zt - (1-at).sqrt() * noise_pred) / at.sqrt()
-            c_skip, c_out = self.get_scalings_for_boundary_condition_discrete(t)
-            z0t = c_out * z0t + c_skip * zt
+            if 'lcm' in self.model:
+                c_skip, c_out = self.get_scalings_for_boundary_condition_discrete(t)
+                z0t = c_out * z0t + c_skip * zt
 
             # add noise
             zt = at_next.sqrt() * z0t + (1-at_next).sqrt() * torch.randn_like(z0t)
@@ -672,14 +698,16 @@ class RandomSolver(LCM, LCMLoRA):
 
 
 @register_solver('random++')
-class RandomppSolver(RandomSolver, LCM, LCMLoRA):
+class RandomppSolver(RandomSolver, LCM, LCMLoRA, DMD):
     def __init__(self, **kwargs):
         solver_config = kwargs.get('solver_config', {})
-        self.do_lora = solver_config['do_lora']
-        if self.do_lora:
+        self.model = solver_config['model']
+        if self.model == 'lcmlora':
             LCMLoRA.__init__(self, **kwargs)
-        else:
+        elif self.model == 'lcm':
             LCM.__init__(self, **kwargs)
+        elif self.model == 'dmd':
+            DMD.__init__(self, **kwargs)
 
     @torch.autocast(device_type='cuda', dtype=torch.float16)
     def reverse_process(self,
@@ -695,9 +723,10 @@ class RandomppSolver(RandomSolver, LCM, LCMLoRA):
         guide_step = kwargs.get('guide_step', 3)
 
         zt = self.initialize_latent(size=(1, 4, shape[1] // self.vae_scale_factor, shape[0] // self.vae_scale_factor))
-        
+
         # sampling
         pbar = tqdm(self.scheduler.timesteps.int(), desc='SDXL')
+        print(self.scheduler.alphas_cumprod)
         for step, t in enumerate(pbar):
             next_t = t - self.skip
             at = self.scheduler.alphas_cumprod[t]
@@ -705,17 +734,20 @@ class RandomppSolver(RandomSolver, LCM, LCMLoRA):
 
             with torch.no_grad():
                 noise_uc, noise_c = self.predict_noise(zt, t, null_prompt_embeds, prompt_embeds, add_cond_kwargs)
-                if self.do_lora:
+                if self.model == 'lcmlora' or self.model == 'dmd':
                     noise_s = noise_c
                 else:
                     noise_s = noise_uc + cfg_guidance * (noise_c - noise_uc)
-            
-            # tweedie and boundary condition parameterization
-            z0t = (zt - (1-at).sqrt() * noise_s) / at.sqrt()
-            c_skip, c_out = self.get_scalings_for_boundary_condition_discrete(t)
-            z0t = c_out * z0t + c_skip * zt
 
-            if step < guide_step: 
+            # tweedie and boundary condition parameterization
+            print(t)
+            print(at)
+            z0t = (zt - (1-at).sqrt() * noise_s) / at.sqrt()
+            if 'lcm' in self.model:
+                c_skip, c_out = self.get_scalings_for_boundary_condition_discrete(t)
+                z0t = c_out * z0t + c_skip * zt
+
+            if step < guide_step:
                 # Renoising for teacher guidance
                 z0t_renoise = at_next.sqrt() * z0t + (1-at_next).sqrt() * torch.randn_like(z0t)
 
@@ -743,7 +775,7 @@ class RandomppSolver(RandomSolver, LCM, LCMLoRA):
 
         # for the last stpe, do not add noise
         return z0t
-    
+
 
 @register_solver('random++_lcm')
 class RandomppLCMSolver(RandomSolver, LCM):
@@ -753,7 +785,7 @@ class RandomppLCMSolver(RandomSolver, LCM):
     """
     def __init__(self, **kwargs):
         LCM.__init__(self, **kwargs)
-    
+
     def get_guidance_scale_embedding(
         self, w: torch.Tensor, embedding_dim: int = 512, dtype: torch.dtype = torch.float32
     ) -> torch.Tensor:
@@ -793,18 +825,18 @@ class RandomppLCMSolver(RandomSolver, LCM):
 
         # added_cond_kwargs for LCM
         add_cond_kwargs_s = {k: v[1].unsqueeze(0) for k, v in add_cond_kwargs.items()}
-        
+
         # sampling
         pbar = tqdm(self.scheduler.timesteps.int(), desc='SDXL')
         for step, t in enumerate(pbar):
             next_t = t - self.skip
             at = self.scheduler.alphas_cumprod[t]
             at_next = self.scheduler.alphas_cumprod[next_t]
-    
+
             with torch.no_grad():
-                noise_s = self.unet(zt, t, 
+                noise_s = self.unet(zt, t,
                                     encoder_hidden_states=prompt_embeds,
-                                    timestep_cond=timestep_cond, 
+                                    timestep_cond=timestep_cond,
                                     added_cond_kwargs=add_cond_kwargs_s)['sample']
 
             # tweedie and boundary condition parameterization
@@ -812,7 +844,7 @@ class RandomppLCMSolver(RandomSolver, LCM):
             c_skip, c_out = self.get_scalings_for_boundary_condition_discrete(t)
             z0t = c_out * z0t + c_skip * zt
 
-            if step < guide_step: 
+            if step < guide_step:
                 # Renoising for teacher guidance
                 z0t_renoise = at_next.sqrt() * z0t + (1-at_next).sqrt() * torch.randn_like(z0t)
 
@@ -858,7 +890,7 @@ class BaseDDIM(SDXL):
         #################################
         # initialize zT
         zt = self.initialize_latent(size=(1, 4, shape[1] // self.vae_scale_factor, shape[0] // self.vae_scale_factor))
-        
+
         # sampling
         pbar = tqdm(self.scheduler.timesteps.int(), desc='SDXL')
         for step, t in enumerate(pbar):
@@ -869,7 +901,7 @@ class BaseDDIM(SDXL):
             with torch.no_grad():
                 noise_uc, noise_c = self.predict_noise(zt, t, null_prompt_embeds, prompt_embeds, add_cond_kwargs)
                 noise_pred = noise_uc + cfg_guidance * (noise_c - noise_uc)
-            
+
             # tweedie
             z0t = (zt - (1-at).sqrt() * noise_pred) / at.sqrt()
 
@@ -913,7 +945,7 @@ class Euler(SDXL):
         zt = self.initialize_latent(method="random_kdiffusion",
                                    latent_dim=zt_dim,
                                    sigmas=sigmas).to(torch.float16)
-        
+
         # sampling
         pbar = tqdm(self.scheduler.timesteps.int(), desc='SDXL')
         for step, t in enumerate(pbar):
@@ -922,7 +954,7 @@ class Euler(SDXL):
 
             with torch.no_grad():
                 z0t, _ = self.kdiffusion_zt_to_denoised(zt, sigma, null_prompt_embeds, prompt_embeds, cfg_guidance, t, add_cond_kwargs)
-            
+
             d = self.to_d(zt, sigma, z0t)
 
             # Euler method
@@ -935,7 +967,7 @@ class Euler(SDXL):
                 callback_kwargs = callback_fn(step, t, callback_kwargs)
                 z0t = callback_kwargs["z0t"]
                 zt = callback_kwargs["zt"]
-            
+
         # for the last stpe, do not add noise
         return z0t
 
@@ -943,7 +975,7 @@ class Euler(SDXL):
 class BaseDDIMLight(BaseDDIM, SDXLLightning):
     def __init__(self, **kwargs):
         SDXLLightning.__init__(self, **kwargs)
-    
+
     def reverse_process(self,
                         null_prompt_embeds,
                         prompt_embeds,
@@ -953,12 +985,12 @@ class BaseDDIMLight(BaseDDIM, SDXLLightning):
                         callback_fn=None,
                         **kwargs):
         assert cfg_guidance == 1.0, "CFG should be turned off in the lightning version"
-        return super().reverse_process(null_prompt_embeds, 
-                                        prompt_embeds, 
-                                        cfg_guidance, 
-                                        add_cond_kwargs, 
-                                        shape, 
-                                        callback_fn, 
+        return super().reverse_process(null_prompt_embeds,
+                                        prompt_embeds,
+                                        cfg_guidance,
+                                        add_cond_kwargs,
+                                        shape,
+                                        callback_fn,
                                         **kwargs)
 
 @register_solver('euler_lightning')
@@ -967,7 +999,7 @@ class EulerLight(Euler, SDXLLightning, SDXLLightningLoRA):
     Karras Euler (VE casted)
     """
     quantize = True
-    
+
     def __init__(self, **kwargs):
         solver_config = kwargs.get('solver_config', {})
         self.do_lora = solver_config['do_lora']
@@ -986,12 +1018,12 @@ class EulerLight(Euler, SDXLLightning, SDXLLightningLoRA):
                         callback_fn=None,
                         **kwargs):
         assert cfg_guidance == 1.0, "CFG should be turned off in the lightning version"
-        return super().reverse_process(null_prompt_embeds, 
-                                        prompt_embeds, 
-                                        cfg_guidance, 
-                                        add_cond_kwargs, 
-                                        shape, 
-                                        callback_fn, 
+        return super().reverse_process(null_prompt_embeds,
+                                        prompt_embeds,
+                                        cfg_guidance,
+                                        add_cond_kwargs,
+                                        shape,
+                                        callback_fn,
                                         **kwargs)
 
 @register_solver('euler_lightning++')
@@ -1022,7 +1054,7 @@ class EulerLightpp(Euler, SDXLLightning, SDXLLightningLoRA, SDXLTurbo):
                         **kwargs):
         teacher_guidance = kwargs.get('teacher_guidance', 0.1)
         guide_step = kwargs.get('guide_step', 2)
-        
+
        # convert to karras sigma scheduler
         total_sigmas = (1-self.total_alphas).sqrt() / self.total_alphas.sqrt()
         #sigmas = get_sigmas_karras(len(self.scheduler.timesteps), total_sigmas.min(), total_sigmas.max(), rho=7.)
@@ -1034,7 +1066,7 @@ class EulerLightpp(Euler, SDXLLightning, SDXLLightningLoRA, SDXLTurbo):
         zt = self.initialize_latent(method="random_kdiffusion",
                                    latent_dim=zt_dim,
                                    sigmas=sigmas).to(torch.float16)
-        
+
         # sampling
         pbar = tqdm(self.scheduler.timesteps.int(), desc='SDXL')
         for step, t in enumerate(pbar):
@@ -1043,7 +1075,7 @@ class EulerLightpp(Euler, SDXLLightning, SDXLLightningLoRA, SDXLTurbo):
 
             with torch.no_grad():
                 z0t, z0t_uncond = self.kdiffusion_zt_to_denoised(zt, sigma, null_prompt_embeds, prompt_embeds, cfg_guidance, t, add_cond_kwargs)
-            
+
             d = self.to_d(zt, sigma, z0t_uncond)
 
             # teacher guidance
@@ -1054,7 +1086,7 @@ class EulerLightpp(Euler, SDXLLightning, SDXLLightningLoRA, SDXLTurbo):
                 # compute noise_teacher
                 with torch.no_grad():
                     z0t_t, _ = self.kdiffusion_zt_to_denoised(zt_renoise, sigmas[step+1], null_prompt_embeds, prompt_embeds, 7.5, t, add_cond_kwargs, model='teacher')
-                
+
                     z0t = z0t + teacher_guidance * (z0t_t - z0t)
 
             # Euler method
@@ -1067,9 +1099,9 @@ class EulerLightpp(Euler, SDXLLightning, SDXLLightningLoRA, SDXLTurbo):
                 callback_kwargs = callback_fn(step, t, callback_kwargs)
                 z0t = callback_kwargs["z0t"]
                 zt = callback_kwargs["zt"]
-            
+
         # for the last stpe, do not add noise
-        return z0t 
+        return z0t
 
 @register_solver("euler_a++")
 class EulerAncestralppSolver(SDXLTurbo):
@@ -1090,7 +1122,7 @@ class EulerAncestralppSolver(SDXLTurbo):
                         **kwargs):
         teacher_guidance = kwargs.get('teacher_guidance', 0.1)
         guide_step = kwargs.get('guide_step', 2)
-        
+
        # convert to karras sigma scheduler
         total_sigmas = (1-self.total_alphas).sqrt() / self.total_alphas.sqrt()
         #sigmas = get_sigmas_karras(len(self.scheduler.timesteps), total_sigmas.min(), total_sigmas.max(), rho=7.)
@@ -1102,7 +1134,7 @@ class EulerAncestralppSolver(SDXLTurbo):
         zt = self.initialize_latent(method="random_kdiffusion",
                                    latent_dim=zt_dim,
                                    sigmas=sigmas).to(torch.float16)
-        
+
         # Sampling
         pbar = tqdm(self.scheduler.timesteps, desc="Euler a")
         for step, _ in enumerate(pbar):
@@ -1111,7 +1143,7 @@ class EulerAncestralppSolver(SDXLTurbo):
             sigma_down, sigma_up = get_ancestral_step(sigmas[step], sigmas[step + 1])
             with torch.no_grad():
                 z0t, z0t_uncond = self.kdiffusion_zt_to_denoised(zt, sigma, null_prompt_embeds, prompt_embeds, cfg_guidance, t, add_cond_kwargs)
-            
+
             d = self.to_d(zt, sigma, z0t_uncond)
 
             # teacher guidance
@@ -1141,9 +1173,9 @@ class EulerAncestralppSolver(SDXLTurbo):
 
                 z0t = callback_kwargs["z0t"]
                 zt = callback_kwargs["zt"]
-            
+
         # for the last stpe, do not add noise
-        return z0t 
+        return z0t
 
 
 @register_solver("ddim_edit")
@@ -1202,7 +1234,7 @@ class EditWardSwapDDIM(BaseDDIM):
             )
         else:
             negative_add_time_ids = add_time_ids
-        negative_text_embeds = pool_null_embed 
+        negative_text_embeds = pool_null_embed
 
         if cfg_guidance != 0.0 and cfg_guidance != 1.0:
             # do cfg
@@ -1222,7 +1254,7 @@ class EditWardSwapDDIM(BaseDDIM):
 
         # reverse sampling
         zt = self.reverse_process(null_prompt_embeds,
-                                  src_prompt_embeds, 
+                                  src_prompt_embeds,
                                   tgt_prompt_embeds,
                                   cfg_guidance,
                                   add_src_cond_kwargs,
@@ -1262,12 +1294,12 @@ class EditWardSwapDDIM(BaseDDIM):
             at_next = self.alpha(t - self.skip)
 
             with torch.no_grad():
-                noise_uc, noise_c = self.predict_noise(zt, t, 
+                noise_uc, noise_c = self.predict_noise(zt, t,
                                                        null_prompt_embeds,
                                                        tgt_prompt_embed,
                                                        add_tgt_cond_kwargs)
                 noise_pred = noise_uc + cfg_guidance * (noise_c - noise_uc)
-            
+
             # tweedie
             z0t = (zt - (1-at).sqrt() * noise_pred) / at.sqrt()
 
@@ -1305,7 +1337,7 @@ class BaseDDIMCFGpp(SDXL):
         #################################
         # initialize zT
         zt = self.initialize_latent(size=(1, 4, shape[1] // self.vae_scale_factor, shape[0] // self.vae_scale_factor))
-        
+
         # sampling
         pbar = tqdm(self.scheduler.timesteps.int(), desc='SDXL')
         for step, t in enumerate(pbar):
@@ -1316,7 +1348,7 @@ class BaseDDIMCFGpp(SDXL):
             with torch.no_grad():
                 noise_uc, noise_c = self.predict_noise(zt, t, null_prompt_embeds, prompt_embeds, add_cond_kwargs)
                 noise_pred = noise_uc + cfg_guidance * (noise_c - noise_uc)
-            
+
             # tweedie
             z0t = (zt - (1-at).sqrt() * noise_pred) / at.sqrt()
 
@@ -1361,7 +1393,7 @@ class EulerCFGpp(SDXL):
         zt = self.initialize_latent(method="random_kdiffusion",
                                    latent_dim=zt_dim,
                                    sigmas=sigmas).to(torch.float16)
-        
+
         # sampling
         pbar = tqdm(self.scheduler.timesteps.int(), desc='SDXL')
         for step, t in enumerate(pbar):
@@ -1370,7 +1402,7 @@ class EulerCFGpp(SDXL):
 
             with torch.no_grad():
                 z0t, z0t_uncond = self.kdiffusion_zt_to_denoised(zt, sigma, null_prompt_embeds, prompt_embeds, cfg_guidance, t, add_cond_kwargs)
-            
+
             d = self.to_d(zt, sigma, z0t_uncond)
 
             # Euler method
@@ -1383,7 +1415,7 @@ class EulerCFGpp(SDXL):
                 callback_kwargs = callback_fn(step, t, callback_kwargs)
                 z0t = callback_kwargs["z0t"]
                 zt = callback_kwargs["zt"]
-            
+
         # for the last stpe, do not add noise
         return z0t
 
@@ -1412,19 +1444,19 @@ class EulerCFGppLight(EulerCFGpp, SDXLLightning, SDXLLightningLoRA):
                         callback_fn=None,
                         **kwargs):
         assert cfg_guidance == 1.0, "CFG should be turned off in the lightning version"
-        return super().reverse_process(null_prompt_embeds, 
-                                        prompt_embeds, 
-                                        cfg_guidance, 
-                                        add_cond_kwargs, 
-                                        shape, 
-                                        callback_fn, 
+        return super().reverse_process(null_prompt_embeds,
+                                        prompt_embeds,
+                                        cfg_guidance,
+                                        add_cond_kwargs,
+                                        shape,
+                                        callback_fn,
                                         **kwargs)
 
 @register_solver('ddim_cfg++_lightning')
 class BaseDDIMCFGppLight(BaseDDIMCFGpp, SDXLLightning):
     def __init__(self, **kwargs):
         SDXLLightning.__init__(self, **kwargs)
-    
+
     def reverse_process(self,
                         null_prompt_embeds,
                         prompt_embeds,
@@ -1434,12 +1466,12 @@ class BaseDDIMCFGppLight(BaseDDIMCFGpp, SDXLLightning):
                         callback_fn=None,
                         **kwargs):
         assert cfg_guidance == 1.0, "CFG should be turned off in the lightning version"
-        return super().reverse_process(null_prompt_embeds, 
-                                        prompt_embeds, 
-                                        cfg_guidance, 
-                                        add_cond_kwargs, 
-                                        shape, 
-                                        callback_fn, 
+        return super().reverse_process(null_prompt_embeds,
+                                        prompt_embeds,
+                                        cfg_guidance,
+                                        add_cond_kwargs,
+                                        shape,
+                                        callback_fn,
                                         **kwargs)
 
 @register_solver('dpm++_2m_cfgpp')
@@ -1463,11 +1495,11 @@ class DPMpp2mCFGppSolver(SDXL):
         alphas = self.scheduler.alphas_cumprod[self.scheduler.timesteps.int().cpu()].cpu()
         sigmas = (1-alphas).sqrt() / alphas.sqrt()
 
-        # initialize 
+        # initialize
         x = self.initialize_latent(method='random',
                                    size=(1, 4, shape[1] // self.vae_scale_factor, shape[0] // self.vae_scale_factor)).to(torch.float16)
         x = x * sigmas[0]
-        
+
         t_fn = lambda sigma: sigma.log().neg()
         old_denoised = None  # initial value
 
@@ -1485,7 +1517,7 @@ class DPMpp2mCFGppSolver(SDXL):
             with torch.no_grad():
                 noise_uc, noise_c = self.predict_noise(x * c_in, new_t, null_prompt_embeds, prompt_embeds, add_cond_kwargs)
                 noise_pred = noise_uc + cfg_guidance * (noise_c - noise_uc)
-            
+
             # tweedie, VE version
             denoised = x + c_out * noise_pred
             uncond_denoised = x + c_out * noise_uc
@@ -1518,7 +1550,7 @@ class DPMpp2mCFGppSolver(SDXL):
 class DPMpp2mCFGppLightningSolver(DPMpp2mCFGppSolver, SDXLLightning):
     def __init__(self, **kwargs):
         SDXLLightning.__init__(self, **kwargs)
-    
+
     def reverse_process(self,
                         null_prompt_embeds,
                         prompt_embeds,
@@ -1528,19 +1560,19 @@ class DPMpp2mCFGppLightningSolver(DPMpp2mCFGppSolver, SDXLLightning):
                         callback_fn=None,
                         **kwargs):
         assert cfg_guidance == 1.0, "CFG should be turned off in the lightning version"
-        return super().reverse_process(null_prompt_embeds, 
-                                        prompt_embeds, 
-                                        cfg_guidance, 
-                                        add_cond_kwargs, 
-                                        shape, 
-                                        callback_fn, 
+        return super().reverse_process(null_prompt_embeds,
+                                        prompt_embeds,
+                                        cfg_guidance,
+                                        add_cond_kwargs,
+                                        shape,
+                                        callback_fn,
                                         **kwargs)
 
 @register_solver("ddim_edit_cfg++")
 class EditWardSwapDDIMCFGpp(EditWardSwapDDIM):
     @torch.no_grad()
     def inversion(self, z0, uc, c, cfg_guidance, add_cond_kwargs):
-        # if we use cfg_guidance=0.0 or 1.0 for inversion, add_cond_kwargs must be splitted. 
+        # if we use cfg_guidance=0.0 or 1.0 for inversion, add_cond_kwargs must be splitted.
         if cfg_guidance == 0.0 or cfg_guidance == 1.0:
             add_cond_kwargs['text_embeds'] = add_cond_kwargs['text_embeds'][-1].unsqueeze(0)
             add_cond_kwargs['time_ids'] = add_cond_kwargs['time_ids'][-1].unsqueeze(0)
@@ -1586,12 +1618,12 @@ class EditWardSwapDDIMCFGpp(EditWardSwapDDIM):
             at_next = self.alpha(t - self.skip)
 
             with torch.no_grad():
-                noise_uc, noise_c = self.predict_noise(zt, t, 
+                noise_uc, noise_c = self.predict_noise(zt, t,
                                                        null_prompt_embeds,
                                                        tgt_prompt_embed,
                                                        add_tgt_cond_kwargs)
                 noise_pred = noise_uc + cfg_guidance * (noise_c - noise_uc)
-            
+
             # tweedie
             z0t = (zt - (1-at).sqrt() * noise_pred) / at.sqrt()
 
@@ -1613,4 +1645,4 @@ class EditWardSwapDDIMCFGpp(EditWardSwapDDIM):
 if __name__ == "__main__":
     # print all list of solvers
     print(f"Possble solvers: {[x for x in __SOLVER__.keys()]}")
-        
+

@@ -20,7 +20,7 @@ def main():
     parser.add_argument("--teacher_guidance", type=float, default=0.02)
     parser.add_argument("--guide_step", type=int, default=2)
     parser.add_argument("--method", type=str, default='ddim')
-    parser.add_argument("--model", type=str, default='sd15', choices=["sd15", "sd20", "sdxl", "sdxl_lightning", "sdxl_lightning_lora", "lcm", "lcmlora", "sdxl_turbo"])
+    parser.add_argument("--model", type=str, default='sd15', choices=["sd15", "sd20", "sdxl", "sdxl_lightning", "sdxl_lightning_lora", "lcm", "lcmlora", "dmd", "sdxl_turbo"])
     parser.add_argument("--NFE", type=int, default=50)
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
@@ -28,7 +28,7 @@ def main():
     set_seed(args.seed)
     create_workdir(args.workdir)
 
-    solver_config = munchify({'num_sampling': args.NFE, 
+    solver_config = munchify({'num_sampling': args.NFE,
                               'do_lora': True if 'lora' in args.model else False,
                               'model': args.model,
                               })
@@ -40,7 +40,7 @@ def main():
     callback = None
 
 
-    if args.model == "sdxl" or args.model == "sdxl_lightning" or args.model == 'sdxl_lightning_lora' or args.model == 'lcm' or args.model == 'lcmlora' or args.model == 'sdxl_turbo':
+    if args.model == "sdxl" or args.model == "sdxl_lightning" or args.model == 'sdxl_lightning_lora' or args.model == 'lcm' or args.model == 'lcmlora' or args.model == 'sdxl_turbo' or args.model == 'dmd':
         solver = get_solver_sdxl(args.method,
                                  solver_config=solver_config,
                                  device=args.device)
@@ -60,7 +60,7 @@ def main():
                                cfg_guidance=args.cfg_guidance,
                                callback_fn=callback)
 
-    
+
     save_image(result, args.workdir.joinpath(f'result/generated.png'), normalize=True)
 
 if __name__ == "__main__":
