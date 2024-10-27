@@ -3,11 +3,13 @@ from pathlib import Path
 
 from munch import munchify
 from torchvision.utils import save_image
+import torch
 
 from latent_diffusion import get_solver
 from latent_sdxl import get_solver as get_solver_sdxl
 from utils.callback_util import ComposeCallback
 from utils.log_util import create_workdir, set_seed
+import time
 
 
 def main():
@@ -45,12 +47,19 @@ def main():
                                  solver_config=solver_config,
                                  device=args.device)
 
+        start_event = torch.cuda.Event(enable_timing=True)
+        end_event = torch.cuda.Event(enable_timing=True)
+
+        start_event.record()
         result = solver.sample(prompt1=[args.null_prompt, args.prompt],
                                 prompt2=[args.null_prompt, args.prompt],
                                 cfg_guidance=args.cfg_guidance,
                                 target_size=(1024, 1024),
                                 callback_fn=callback,
                                 **guide_config)
+        end_event.record()
+        torch.cuda.synchronize()
+        print("Time: ", start_event.elapsed_time(end_event), "ms")
 
     else:
         solver = get_solver(args.method,
