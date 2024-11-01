@@ -28,11 +28,11 @@ def main():
     img_list2 = sorted(glob(str(args.result_dir2 / '*.png')))
     reward1, reward2 = 0, 0
 
-    model = RM.load("ImageReward-v1.0")
+    model = RM.load("ImageReward-v1.0").to('cuda')
 
     for i, (text, img1, img2) in enumerate(zip(text_list, img_list1, img_list2)):
         reward1 += model.score(text, img1)
-        reward2 += model.score(text, img2) 
+        reward2 += model.score(text, img2)
         if (i + 1) % 1000 == 0:
             print(f"Processed {i+1} samples")
     print(f"Average reward1: {reward1 / len(text_list)}")

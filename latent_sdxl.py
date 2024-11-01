@@ -562,7 +562,6 @@ class LCM(SDXL):
         #self.final_alpha_cumprod = self.scheduler.final_alpha_cumprod.to(device)
         self.scheduler.alphas_cumprod = torch.cat([torch.tensor([1.0]), self.scheduler.alphas_cumprod]).to(device)
 
-<<<<<<< HEAD
 class SDXLTurbo(SDXL):
     def __init__(self,
                  solver_config: dict,

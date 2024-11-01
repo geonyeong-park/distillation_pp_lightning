@@ -17,7 +17,9 @@
 #python -m examples.run_mscoco --method "euler_a++" --model "sdxl_turbo" --cfg_guidance 1 --NFE 4 --seed 777 --workdir 'examples/workdir/mscoco/turbo' --guide_step 0 --teacher_guidance 0.
 #python -m examples.run_mscoco --method "euler_a++" --model "sdxl_turbo" --cfg_guidance 1 --NFE 4 --seed 777 --workdir 'examples/workdir/mscoco/turbo_pp_guide2_0.02' --guide_step 2 --teacher_guidance 0.02
 #python -m examples.run_mscoco --method "euler_a++" --model "sdxl_turbo" --cfg_guidance 1 --NFE 4 --seed 777 --workdir 'examples/workdir/mscoco/turbo_pp_guide2_0.1' --guide_step 2 --teacher_guidance 0.1
-python -m examples.run_mscoco --method "random++" --model "lcmlora" --cfg_guidance 6 --NFE 5 --seed 777 --workdir 'examples/workdir/mscoco/lcmlora_5step' --guide_step 0
-python -m examples.run_mscoco --method "random++" --model "lcmlora" --cfg_guidance 6 --NFE 3 --seed 777 --workdir 'examples/workdir/mscoco/lcmlora_3step_1guide' --guide_step 1 --teacher_guidance 0.02
+#python -m examples.run_mscoco --method "random++" --model "lcmlora" --cfg_guidance 6 --NFE 5 --seed 777 --workdir 'examples/workdir/mscoco/lcmlora_5step' --guide_step 0
+#python -m examples.run_mscoco --method "random++" --model "lcmlora" --cfg_guidance 6 --NFE 3 --seed 777 --workdir 'examples/workdir/mscoco/lcmlora_3step_1guide' --guide_step 1 --teacher_guidance 0.02
 #python -m examples.run_mscoco --method "random++" --model "lcmlora" --cfg_guidance 6 --NFE 5 --seed 777 --workdir 'examples/workdir/mscoco/lcmlora_5step_1guide' --guide_step 1
 #python -m examples.run_mscoco --method "random++" --model "lcmlora" --cfg_guidance 6 --NFE 6 --seed 777 --workdir 'examples/workdir/mscoco/lcmlora_6step' --guide_step 0
+#python -m examples.run_mscoco --method "random++" --model "lcmlora" --cfg_guidance 6 --NFE 5 --seed 777 --workdir '/home/user/hdisk/distillation_pp_results/mscoco/lcmlora_5step_1guide_0.02' --guide_step 1 --teacher_guidance 0.02
+#python -m examples.run_mscoco --method "random++" --model "lcmlora" --cfg_guidance 6 --NFE 6 --seed 777 --workdir '/home/user/hdisk/distillation_pp_results/mscoco/lcmlora_6step' --guide_step 0
