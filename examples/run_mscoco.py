@@ -29,7 +29,7 @@ def main():
     parser = argparse.ArgumentParser(description="Latent Diffusion")
     parser.add_argument("--workdir", type=Path, default="examples/workdir/t2i")
     parser.add_argument("--device", type=str, default="cuda")
-    parser.add_argument("--null_prompt", type=str, default="low quality,jpeg artifacts,blurry,poorly drawn,ugly,worst quality,")
+    parser.add_argument("--null_prompt", type=str, default="ugly, deformed, noisy, blurry, low contrast, text, 3d, cgi, render, anime, open mouth, big forehead, long neck")
     parser.add_argument("--prompt", type=str, default="")
     parser.add_argument("--cfg_guidance", type=float, default=7.5)
     parser.add_argument("--teacher_guidance", type=float, default=0.1)
@@ -75,7 +75,7 @@ def main():
         result = solver.sample(prompt1=[args.null_prompt, text],
                                 prompt2=[args.null_prompt, text],
                                 cfg_guidance=args.cfg_guidance,
-                                target_size=(1024, 1024),
+                                target_size=(512, 512),
                                 callback_fn=callback,
                                 **guide_config)
         fname = os.path.join(args.workdir, f'{str(i).zfill(5)}.png')

@@ -54,7 +54,7 @@ def main():
         result = solver.sample(prompt1=[args.null_prompt, args.prompt],
                                 prompt2=[args.null_prompt, args.prompt],
                                 cfg_guidance=args.cfg_guidance,
-                                target_size=(1024, 1024),
+                                target_size=(512, 512),
                                 callback_fn=callback,
                                 **guide_config)
         end_event.record()
