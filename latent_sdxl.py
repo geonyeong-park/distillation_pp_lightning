@@ -568,6 +568,7 @@ class SDXLTurbo(SDXL):
                  base_model_key:str="stabilityai/stable-diffusion-xl-base-1.0",
                  #turbo_key:str="stabilityai/sdxl-turbo",
                  turbo_key:str="ckpt/dreamshaperXL_v21TurboDPMSDE.safetensors",
+                 #turbo_key:str="ckpt/turbovisionxlSuperFastXLBasedOnNew_tvxlV431Bakedvae.safetensors",
                  dtype=torch.float16,
                  device='cuda'):
 
@@ -1056,6 +1057,7 @@ class EulerLightpp(Euler, SDXLLightning, SDXLLightningLoRA, SDXLTurbo):
                         **kwargs):
         teacher_guidance = kwargs.get('teacher_guidance', 0.1)
         guide_step = kwargs.get('guide_step', 2)
+        renoise = kwargs.get('renoise', 'random')
 
        # convert to karras sigma scheduler
         total_sigmas = (1-self.total_alphas).sqrt() / self.total_alphas.sqrt()
@@ -1083,7 +1085,17 @@ class EulerLightpp(Euler, SDXLLightning, SDXLLightningLoRA, SDXLTurbo):
             # teacher guidance
             if step < guide_step:
                 # Renoising for teacher guidance
-                zt_renoise = z0t + torch.randn_like(d) * sigmas[step+1]
+                if renoise == 'random':
+                    zt_renoise = z0t + torch.randn_like(d) * sigmas[step+1]
+                elif renoise == 'deterministic':
+                    zt_renoise = z0t + d * sigmas[step+1]
+                elif renoise == 'hybrid':
+                    next_t = t - self.skip
+                    at_next = self.scheduler.alphas_cumprod[next_t]
+                    std1 = (1 - at_next) ** 0.5
+                    std2 = at_next ** 0.5
+                    zt_renoise = z0t + std2 * torch.randn_like(d) + std1 * d.detach()
+                    print(f'{step}: {std1}, {std2}')
 
                 # compute noise_teacher
                 with torch.no_grad():
