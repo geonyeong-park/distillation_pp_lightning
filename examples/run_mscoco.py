@@ -27,7 +27,7 @@ def set_seed(seed: int):
 
 def main():
     parser = argparse.ArgumentParser(description="Latent Diffusion")
-    parser.add_argument("--workdir", type=Path, default="examples/workdir/t2i")
+    parser.add_argument("--workdir", type=Path, default="/home/user/hdisk/distillation_pp_results/curated_prompts")
     parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument("--null_prompt", type=str, default="ugly, deformed, noisy, blurry, low contrast, text, 3d, cgi, render, anime, open mouth, big forehead, long neck")
     parser.add_argument("--prompt", type=str, default="")
@@ -44,6 +44,7 @@ def main():
     args = parser.parse_args()
 
     set_seed(args.seed)
+    args.workdir = args.workdir / f'{args.model}_{args.NFE}step_{args.teacher_guidance}_guide{args.guide_step}_{args.renoise}'
     create_workdir(args.workdir)
 
     solver_config = munchify({'num_sampling': args.NFE,

@@ -566,15 +566,15 @@ class SDXLTurbo(SDXL):
     def __init__(self,
                  solver_config: dict,
                  base_model_key:str="stabilityai/stable-diffusion-xl-base-1.0",
-                 #turbo_key:str="stabilityai/sdxl-turbo",
-                 turbo_key:str="ckpt/dreamshaperXL_v21TurboDPMSDE.safetensors",
+                 turbo_key:str="stabilityai/sdxl-turbo",
+                 #turbo_key:str="ckpt/dreamshaperXL_v21TurboDPMSDE.safetensors",
                  #turbo_key:str="ckpt/turbovisionxlSuperFastXLBasedOnNew_tvxlV431Bakedvae.safetensors",
                  dtype=torch.float16,
                  device='cuda'):
 
         self.device = device
-        #pipe = StableDiffusionXLPipeline.from_pretrained(turbo_key, torch_dtype=dtype).to(device)
-        pipe = StableDiffusionXLPipeline.from_single_file(turbo_key, torch_dtype=dtype).to(device)
+        pipe = StableDiffusionXLPipeline.from_pretrained(turbo_key, torch_dtype=dtype).to(device)
+        #pipe = StableDiffusionXLPipeline.from_single_file(turbo_key, torch_dtype=dtype).to(device)
         self.dtype = dtype
 
         # avoid overflow in float16
@@ -592,8 +592,8 @@ class SDXLTurbo(SDXL):
         self.default_sample_size = self.unet.config.sample_size
 
         # sampling parameters
-        #self.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config, timestep_spacing="trailing")
-        self.scheduler = EulerDiscreteScheduler.from_config(pipe.scheduler.config, timestep_spacing="trailing")
+        self.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config, timestep_spacing="trailing")
+        #self.scheduler = EulerDiscreteScheduler.from_config(pipe.scheduler.config, timestep_spacing="trailing")
 
         self.total_alphas = self.scheduler.alphas_cumprod.clone()
 
@@ -729,7 +729,6 @@ class RandomppSolver(RandomSolver, LCM, LCMLoRA, DMD):
 
         # sampling
         pbar = tqdm(self.scheduler.timesteps.int(), desc='SDXL')
-        print(self.scheduler.alphas_cumprod)
         for step, t in enumerate(pbar):
             next_t = t - self.skip
             at = self.scheduler.alphas_cumprod[t]
@@ -743,8 +742,6 @@ class RandomppSolver(RandomSolver, LCM, LCMLoRA, DMD):
                     noise_s = noise_uc + cfg_guidance * (noise_c - noise_uc)
 
             # tweedie and boundary condition parameterization
-            print(t)
-            print(at)
             z0t = (zt - (1-at).sqrt() * noise_s) / at.sqrt()
             if 'lcm' in self.model:
                 c_skip, c_out = self.get_scalings_for_boundary_condition_discrete(t)
@@ -758,6 +755,9 @@ class RandomppSolver(RandomSolver, LCM, LCMLoRA, DMD):
                 with torch.no_grad():
                     noise_uc, noise_c = self.predict_noise(z0t_renoise, next_t, null_prompt_embeds, prompt_embeds, add_cond_kwargs, model='teacher')
                     noise_t = noise_uc + cfg_guidance * (noise_c - noise_uc)
+                
+                    #z0t_t = (z0t_renoise - (1-at_next).sqrt() * noise_t) / at_next.sqrt()
+                    #z0t = z0t + teacher_guidance * (z0t_t - z0t)
 
                 noise_pred = noise_s + teacher_guidance * (noise_t - noise_s)
 
@@ -1136,6 +1136,7 @@ class EulerAncestralppSolver(SDXLTurbo):
                         **kwargs):
         teacher_guidance = kwargs.get('teacher_guidance', 0.1)
         guide_step = kwargs.get('guide_step', 2)
+        renoise = kwargs.get('renoise', 'random')
 
        # convert to karras sigma scheduler
         total_sigmas = (1-self.total_alphas).sqrt() / self.total_alphas.sqrt()
@@ -1163,7 +1164,19 @@ class EulerAncestralppSolver(SDXLTurbo):
             # teacher guidance
             if step < guide_step:
                 # Renoising for teacher guidance
-                zt_renoise = z0t + torch.randn_like(d) * sigma_down
+                if renoise == 'random':
+                    zt_renoise = z0t + torch.randn_like(d) * sigma_down
+                elif renoise == 'deterministic':
+                    zt_renoise = z0t + d * sigma_down
+                elif renoise == 'hybrid':
+                    next_t = t - self.skip
+                    at_next = self.scheduler.alphas_cumprod[next_t]
+                    std1 = (1 - at_next) ** 0.5
+                    std2 = at_next ** 0.5
+                    zt_renoise = z0t + std2 * torch.randn_like(d) + std1 * d.detach()
+                    print(f'{step}: {std1}, {std2}')
+
+                #zt_renoise = z0t + torch.randn_like(d) * sigma_down
                 next_sigma = sigma_down
                 if sigmas[step + 1] > 0:
                     zt_renoise = zt_renoise + torch.randn_like(zt_renoise) * sigma_up

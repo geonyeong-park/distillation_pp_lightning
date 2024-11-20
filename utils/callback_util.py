@@ -38,36 +38,38 @@ class DiffusionCallback:
 
 @register_callback("draw_tweedie")
 class DrawTweedieCallback(DiffusionCallback):
-    def __init__(self, frequency: int, workdir: Path):
+    def __init__(self, frequency: int, workdir: Path, seed: int):
         super().__init__(frequency, workdir)
-        workdir.joinpath("record/tweedie").mkdir(parents=True, exist_ok=True)
+        workdir.joinpath(f"record/tweedie/seed{seed}").mkdir(parents=True, exist_ok=True)
+        self.seed = seed
 
     @torch.no_grad()
     def callback(self, step, t, callback_kwargs):
         z0t = callback_kwargs["z0t"]
         x0t = callback_kwargs["decode"](z0t)
         x0t = (x0t / 2 + 0.5).clamp(0, 1).cpu()
-        save_image(x0t, self.workdir.joinpath(f"record/tweedie/x0_{int(t)}.png"))
+        save_image(x0t, self.workdir.joinpath(f"record/tweedie/seed{self.seed}/x0_{int(t)}.png"))
         return callback_kwargs
 
 @register_callback("draw_noisy")
 class DrawNoisyCallback(DiffusionCallback):
-    def __init__(self, frequency: int, workdir: Path):
+    def __init__(self, frequency: int, workdir: Path, seed: int):
         super().__init__(frequency, workdir)
-        workdir.joinpath("record/noisy").mkdir(parents=True, exist_ok=True)
+        workdir.joinpath(f"record/noisy/seed{seed}").mkdir(parents=True, exist_ok=True)
+        self.seed = seed
 
     @torch.no_grad()
     def callback(self, step, t, callback_kwargs):
         z0t = callback_kwargs["zt"]
         x0t = callback_kwargs["decode"](z0t)
         x0t = (x0t / 2 + 0.5).clamp(0, 1).cpu()
-        save_image(x0t, self.workdir.joinpath(f"record/noisy/xt_{int(t)}.png"))
+        save_image(x0t, self.workdir.joinpath(f"record/noisy/seed{self.seed}/xt_{int(t)}.png"))
         return callback_kwargs
 
 class ComposeCallback(DiffusionCallback):
-    def __init__(self, workdir, callbacks: list[str], frequency:int=5):
+    def __init__(self, workdir, callbacks: list[str], frequency:int=5, seed:int=42):
         super().__init__(frequency, workdir)
-        self.callbacks = [get_callback(name, workdir=workdir, frequency=frequency) for name in callbacks]
+        self.callbacks = [get_callback(name, workdir=workdir, frequency=frequency, seed=seed) for name in callbacks]
 
     def __call__(self, step, t, callback_kwargs):
         for callback in self.callbacks:

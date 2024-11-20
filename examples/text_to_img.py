@@ -39,9 +39,12 @@ def main():
                              'guide_step': args.guide_step,
                              'renoise': args.renoise,
                              })
-    #callback = ComposeCallback(workdir=args.workdir,
-    #                           frequency=1,
-    #                           callbacks=["draw_noisy", 'draw_tweedie'])
+    """
+    callback = ComposeCallback(workdir=args.workdir,
+                               frequency=1,
+                               callbacks=["draw_noisy", 'draw_tweedie'],
+                               seed=args.seed)
+    """
     callback = None
 
 
